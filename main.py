@@ -1,20 +1,19 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from dotenv import load_dotenv
-from openai import OpenAI
+import requests
 
-load_dotenv()
-
-client = OpenAI()
 
 app = FastAPI(
     title="InclusIA",
-    version="0.2.0"
+    version="0.3.0"
 )
 
 
-class Pergunta(BaseModel):
-    mensagem: str
+class Atividade(BaseModel):
+    disciplina: str
+    ano: str
+    atividade: str
+    necessidade: str
 
 
 @app.get("/")
@@ -26,20 +25,51 @@ def inicio():
 
 
 @app.post("/chat")
-def chat(pergunta: Pergunta):
+def chat(atividade: Atividade):
 
-    resposta = client.responses.create(
-        model="gpt-5-mini",
-        instructions=(
-            "Você é a InclusIA, uma assistente especializada em "
-            "Educação Inclusiva. Responda em português do Brasil, "
-            "de forma clara, acolhedora e profissional. "
-            "Não substitua profissionais especializados e não "
-            "invente informações."
-        ),
-        input=pergunta.mensagem
+    prompt = f"""
+Você é a InclusIA, uma assistente de Educação Inclusiva.
+
+Responda em português do Brasil, de forma clara, acolhedora e profissional.
+
+Sua função é auxiliar professores e profissionais da educação na adaptação
+de atividades pedagógicas.
+
+Não substitua a avaliação de profissionais especializados.
+Não invente informações sobre o estudante.
+
+Analise a atividade abaixo:
+
+Disciplina: {atividade.disciplina}
+Ano: {atividade.ano}
+Atividade: {atividade.atividade}
+Necessidade educacional: {atividade.necessidade}
+
+Forneça uma sugestão de adaptação pedagógica contendo:
+
+1. Objetivo da atividade
+2. Adaptação sugerida
+3. Estratégia de aplicação
+4. Recursos necessários
+5. Forma de avaliação
+
+A adaptação deve ser prática e adequada ao contexto escolar.
+"""
+
+    resposta = requests.post(
+        "http://localhost:11434/api/generate",
+        json={
+            "model": "llama3.2:latest",
+            "prompt": prompt,
+            "stream": False
+        },
+        timeout=120
     )
 
+    resposta.raise_for_status()
+
+    dados = resposta.json()
+
     return {
-        "resposta": resposta.output_text
+        "resposta": dados["response"]
     }
